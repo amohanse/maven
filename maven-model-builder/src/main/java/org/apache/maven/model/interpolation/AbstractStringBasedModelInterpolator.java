@@ -56,6 +56,12 @@ import org.codehaus.plexus.interpolation.ValueSource;
 public abstract class AbstractStringBasedModelInterpolator
     implements ModelInterpolator
 {
+    private static final String SHA1_PROPERTY = "sha1";
+
+    private static final String CHANGELIST_PROPERTY = "changelist";
+
+    private static final String REVISION_PROPERTY = "revision";
+
     private static final List<String> PROJECT_PREFIXES = Arrays.asList( "pom.", "project." );
 
     private static final Collection<String> TRANSLATED_PATH_EXPRESSIONS;
@@ -165,9 +171,23 @@ public abstract class AbstractStringBasedModelInterpolator
 
         valueSources.add( new MapBasedValueSource( config.getUserProperties() ) );
 
+        // Overwrite existing values in model properties. Otherwise it's not possible
+        // to define the version via command line: mvn -Drevision=6.5.7 ...
+        if ( config.getSystemProperties().containsKey( REVISION_PROPERTY ) )
+        {
+            modelProperties.put( REVISION_PROPERTY, config.getSystemProperties().get( REVISION_PROPERTY ) );
+        }
+        if ( config.getSystemProperties().containsKey( CHANGELIST_PROPERTY ) )
+        {
+            modelProperties.put( CHANGELIST_PROPERTY, config.getSystemProperties().get( CHANGELIST_PROPERTY ) );
+        }
+        if ( config.getSystemProperties().containsKey( SHA1_PROPERTY ) )
+        {
+            modelProperties.put( SHA1_PROPERTY, config.getSystemProperties().get( SHA1_PROPERTY ) );
+        }
         valueSources.add( new MapBasedValueSource( modelProperties ) );
 
-        valueSources.add( new MapBasedValueSource( config.getSystemProperties() ) );
+        valueSources.add( new MapBasedValueSource   ( config.getSystemProperties() ) );
 
         valueSources.add( new AbstractValueSource( false )
         {
@@ -183,15 +203,14 @@ public abstract class AbstractStringBasedModelInterpolator
         return valueSources;
     }
 
-    protected List<? extends InterpolationPostProcessor> createPostProcessors( final Model model,
-                                                                               final File projectDir,
+    protected List<? extends InterpolationPostProcessor> createPostProcessors( final Model model, final File projectDir,
                                                                                final ModelBuildingRequest config )
     {
         List<InterpolationPostProcessor> processors = new ArrayList<>( 2 );
         if ( projectDir != null )
         {
-            processors.add( new PathTranslatingPostProcessor( PROJECT_PREFIXES, TRANSLATED_PATH_EXPRESSIONS,
-                                                              projectDir, pathTranslator ) );
+            processors.add( new PathTranslatingPostProcessor( PROJECT_PREFIXES, TRANSLATED_PATH_EXPRESSIONS, projectDir,
+                                                              pathTranslator ) );
         }
         processors.add( new UrlNormalizingPostProcessor( urlNormalizer ) );
         return processors;
@@ -228,8 +247,10 @@ public abstract class AbstractStringBasedModelInterpolator
                 }
                 catch ( InterpolationException e )
                 {
+                    //@formatter:off
                     problems.add( new ModelProblemCollectorRequest( Severity.ERROR, Version.BASE )
-                        .setMessage( e.getMessage() ).setException( e ) );
+                                  .setMessage( e.getMessage() ).setException( e ) );
+                    //@formatter:on
                 }
 
                 interpolator.clearFeedback();
